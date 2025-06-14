@@ -46,7 +46,7 @@ export const updatePlayer = (player: Player, deltaTime: number): Player => {
 
 export const spawnEnemies = (player: Player): Enemy[] => {
     const enemies: Enemy[] = [];
-    const { INITIAL_X, INITIAL_Y, INITIAL_HEALTH, RADIUS, SPEED } = gameConfig.ENEMY;
+    const { INITIAL_HEALTH, RADIUS, SPEED } = gameConfig.ENEMY;
 
     for (let i = 0; i < gameConfig.ENEMY_COUNT; i++) {
         let x: number, y: number;
