@@ -25,7 +25,7 @@ export default function Game() {
       right: false,
     },
     speed: 2.5,
-    rotSpeed: 0.06,
+    rotSpeed: 0.01,
     attackCooldown: 0,
   });
   const enemiesRef = useRef<Enemy[]>([]);
