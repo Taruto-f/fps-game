@@ -1,7 +1,7 @@
 import { GameConfig } from '../types/game';
 
 export const gameConfig: GameConfig = {
-    WIDTH: 800,
+    WIDTH: 600,
     HEIGHT: 450,
     MAP_W: 16,
     MAP_H: 16,
