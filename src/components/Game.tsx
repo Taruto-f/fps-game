@@ -52,7 +52,7 @@ export default function Game() {
       const dt = (time - lastTime) / 16.6667;
       lastTime = time;
 
-      const updatedPlayer = updatePlayer(playerRef.current);
+      const updatedPlayer = updatePlayer(playerRef.current, dt);
       playerRef.current = updatedPlayer;
       setPlayer(updatedPlayer);
 
@@ -153,12 +153,12 @@ export default function Game() {
   const handleShoot = () => {
     if (playerRef.current.ammo <= 0 || reloading || gameState !== 'playing') return;
 
-    const { player: newPlayer, enemies: newEnemies, hitEnemy } = shoot(playerRef.current, enemiesRef.current);
+    const { player: newPlayer, enemies: newEnemies } = shoot(playerRef.current, enemiesRef.current);
     playerRef.current = newPlayer;
     enemiesRef.current = newEnemies;
     setPlayer(newPlayer);
     setEnemies(newEnemies);
-    setHitMarker(hitEnemy);
+    setHitMarker(true);
 
     setTimeout(() => setHitMarker(false), 100);
   };
