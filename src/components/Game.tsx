@@ -17,8 +17,8 @@ export default function Game() {
     ammo: 50,
     maxAmmo: 50,
     moving: { forward: false, backward: false, left: false, right: false },
-    speed: 0.8,
-    rotSpeed: 0.01,
+    speed: 0.4,
+    rotSpeed: 0.005,
     attackCooldown: 0,
   });
   const enemiesRef = useRef<Enemy[]>([]);
@@ -198,8 +198,8 @@ export default function Game() {
       ammo: 50,
       maxAmmo: 50,
       moving: { forward: false, backward: false, left: false, right: false },
-      speed: 0.8,
-      rotSpeed: 0.01,
+      speed: 0.4,
+      rotSpeed: 0.005,
       attackCooldown: 0,
     };
     playerRef.current = newPlayer;

@@ -131,9 +131,9 @@ export function shoot(player: Player, enemies: Enemy[]): { player: Player, enemi
 
     // 最も近い敵にダメージを与える
     const updatedEnemies = enemies.map(enemy => {
-        if (enemy === closestEnemy && closestDistance < 5 * gameConfig.TILE_SIZE) {
+        if (enemy === closestEnemy && closestDistance < 8 * gameConfig.TILE_SIZE) {
             hitEnemy = true;
-            return { ...enemy, health: enemy.health - 25 };
+            return { ...enemy, health: enemy.health - 35 };
         }
         return enemy;
     });
