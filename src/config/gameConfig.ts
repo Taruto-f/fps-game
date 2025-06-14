@@ -1,15 +1,15 @@
 import { GameConfig } from '../types/game';
 
 export const gameConfig: GameConfig = {
-    WIDTH: 600,
+    WIDTH: 800,
     HEIGHT: 450,
-    MAP_W: 16,
-    MAP_H: 16,
-    TILE_SIZE: 48,
+    MAP_W: 24,
+    MAP_H: 24,
+    TILE_SIZE: 64,
     MINIMAP_SCALE: 8,
     RAY_COUNT: 320,
     MAX_DEPTH: 1280,
-    ENEMY_COUNT: 8
+    ENEMY_COUNT: 10
 };
 
 export const MAP = [
