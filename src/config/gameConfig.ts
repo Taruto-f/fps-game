@@ -1,6 +1,6 @@
 import { GameConfig } from '../types/game';
 
-export const gameConfig: GameConfig = {
+export const gameConfig = {
     WIDTH: 800,
     HEIGHT: 450,
     MAP_W: 24,
@@ -9,8 +9,30 @@ export const gameConfig: GameConfig = {
     MINIMAP_SCALE: 8,
     RAY_COUNT: 320,
     MAX_DEPTH: 1280,
-    ENEMY_COUNT: 10
-};
+    ENEMY_COUNT: 10,
+    PLAYER: {
+        INITIAL_X: 192, // TILE_SIZE * 3
+        INITIAL_Y: 192, // TILE_SIZE * 3
+        INITIAL_DIR: 0,
+        FOV: Math.PI / 3,
+        INITIAL_HEALTH: 100,
+        INITIAL_AMMO: 50,
+        SPEED: 2.5,
+        ROT_SPEED: 0.06,
+    },
+    ENEMY: {
+        RADIUS: 12,
+        INITIAL_HEALTH: 30,
+        ATTACK_DAMAGE: 10,
+        ATTACK_COOLDOWN: 900,
+        SPEED: 1.2,
+    },
+    SHOOTING: {
+        DAMAGE: 20,
+        MAX_DISTANCE: 1000,
+        STEP: 5,
+    },
+} as const;
 
 export const MAP = [
     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
@@ -37,4 +59,4 @@ export const MAP = [
     1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1,
     1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-]; 
+] as const; 

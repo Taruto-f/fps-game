@@ -1,11 +1,11 @@
 import { Player, Enemy, GameState } from '../types/game';
 import { gameConfig, MAP } from '../config/gameConfig';
 
-export function distance(x1: number, y1: number, x2: number, y2: number): number {
+export const distance = (x1: number, y1: number, x2: number, y2: number): number => {
     return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
-}
+};
 
-export function isWall(x: number, y: number): boolean {
+export const isWall = (x: number, y: number): boolean => {
     const mapX = Math.floor(x / gameConfig.TILE_SIZE);
     const mapY = Math.floor(y / gameConfig.TILE_SIZE);
 
@@ -14,210 +14,136 @@ export function isWall(x: number, y: number): boolean {
     }
 
     return MAP[mapY * gameConfig.MAP_W + mapX] !== 0;
-}
+};
 
-export function updatePlayer(player: Player): Player {
-    const { moving, speed } = player;
-    let newX = player.x;
-    let newY = player.y;
+export const updatePlayer = (player: Player, deltaTime: number): Player => {
+    const newPlayer = { ...player };
+    const moveSpeed = player.speed * deltaTime;
+    const rotSpeed = player.rotSpeed * deltaTime;
 
-    if (moving.forward) {
-        newX += Math.cos(player.dir) * speed;
-        newY += Math.sin(player.dir) * speed;
+    if (player.moving.left) {
+        newPlayer.dir -= rotSpeed;
     }
-    if (moving.backward) {
-        newX -= Math.cos(player.dir) * speed;
-        newY -= Math.sin(player.dir) * speed;
-    }
-    if (moving.left) {
-        newX += Math.cos(player.dir - Math.PI / 2) * speed;
-        newY += Math.sin(player.dir - Math.PI / 2) * speed;
-    }
-    if (moving.right) {
-        newX += Math.cos(player.dir + Math.PI / 2) * speed;
-        newY += Math.sin(player.dir + Math.PI / 2) * speed;
+    if (player.moving.right) {
+        newPlayer.dir += rotSpeed;
     }
 
-    if (!isWall(newX, newY)) {
-        return { ...player, x: newX, y: newY };
+    if (player.moving.forward) {
+        const newX = player.x + Math.cos(player.dir) * moveSpeed;
+        const newY = player.y + Math.sin(player.dir) * moveSpeed;
+        if (!isWall(newX, player.y)) newPlayer.x = newX;
+        if (!isWall(player.x, newY)) newPlayer.y = newY;
     }
-    return player;
-}
+    if (player.moving.backward) {
+        const newX = player.x - Math.cos(player.dir) * moveSpeed;
+        const newY = player.y - Math.sin(player.dir) * moveSpeed;
+        if (!isWall(newX, player.y)) newPlayer.x = newX;
+        if (!isWall(player.x, newY)) newPlayer.y = newY;
+    }
 
-export function spawnEnemies(player: Player): Enemy[] {
+    return newPlayer;
+};
+
+export const spawnEnemies = (player: Player): Enemy[] => {
     const enemies: Enemy[] = [];
-    const minDistance = gameConfig.TILE_SIZE * 5;
+    const { INITIAL_X, INITIAL_Y, INITIAL_HEALTH, RADIUS, SPEED } = gameConfig.ENEMY;
 
     for (let i = 0; i < gameConfig.ENEMY_COUNT; i++) {
         let x: number, y: number;
-        let validPosition = false;
+        do {
+            x = Math.random() * (gameConfig.MAP_W - 2) * gameConfig.TILE_SIZE + gameConfig.TILE_SIZE;
+            y = Math.random() * (gameConfig.MAP_H - 2) * gameConfig.TILE_SIZE + gameConfig.TILE_SIZE;
+        } while (
+            isWall(x, y) ||
+            distance(x, y, player.x, player.y) < gameConfig.TILE_SIZE * 3 ||
+            enemies.some(e => distance(x, y, e.x, e.y) < gameConfig.TILE_SIZE)
+        );
 
-        while (!validPosition) {
-            x = Math.random() * (gameConfig.MAP_W * gameConfig.TILE_SIZE);
-            y = Math.random() * (gameConfig.MAP_H * gameConfig.TILE_SIZE);
-
-            // 壁との衝突チェック
-            if (isWall(x, y)) continue;
-
-            // 他の敵との衝突チェック
-            const tooClose = enemies.some(enemy =>
-                distance(x, y, enemy.x, enemy.y) < gameConfig.TILE_SIZE * 2
-            );
-            if (tooClose) continue;
-
-            // プレイヤーとの距離チェック
-            if (distance(x, y, player.x, player.y) < minDistance) continue;
-
-            validPosition = true;
-            enemies.push({
-                x,
-                y,
-                radius: gameConfig.TILE_SIZE / 2,
-                alive: true,
-                health: 100, // 敵のHPを100に設定
-                maxHealth: 100,
-                attackCooldown: 0,
-                speed: 0.3, // 敵の移動速度を0.3に設定
-            });
-        }
+        enemies.push({
+            x,
+            y,
+            radius: RADIUS,
+            alive: true,
+            health: INITIAL_HEALTH,
+            maxHealth: INITIAL_HEALTH,
+            attackCooldown: 0,
+            speed: SPEED,
+        });
     }
 
     return enemies;
-}
+};
 
-export function shoot(player: Player, enemies: Enemy[]): { player: Player, enemies: Enemy[], hitEnemy: boolean } {
-    if (player.ammo <= 0) return { player, enemies, hitEnemy: false };
+export const shoot = (player: Player, enemies: Enemy[]): { player: Player; enemies: Enemy[] } => {
+    if (player.ammo <= 0 || player.attackCooldown > 0) {
+        return { player, enemies };
+    }
 
-    const updatedPlayer = { ...player, ammo: player.ammo - 1 };
-    let hitEnemy = false;
+    const newPlayer = { ...player, ammo: player.ammo - 1, attackCooldown: 500 };
+    const newEnemies = [...enemies];
     let closestEnemy: Enemy | null = null;
     let closestDistance = Infinity;
 
-    // プレイヤーの視野内の敵を探す
-    enemies.forEach(enemy => {
-        if (!enemy.alive) return;
+    for (const enemy of newEnemies) {
+        if (!enemy.alive) continue;
 
-        const dx = enemy.x - player.x;
-        const dy = enemy.y - player.y;
-        const angle = Math.atan2(dy, dx);
-        const angleDiff = Math.abs(angle - player.dir);
-
-        // プレイヤーの視野内（FOV）に敵がいるかチェック
-        if (angleDiff < player.fov / 2) {
-            const distance = Math.sqrt(dx * dx + dy * dy);
-
-            // 壁との衝突チェック
-            let rayX = player.x;
-            let rayY = player.y;
-            let hitWall = false;
-
-            while (!hitWall && distance > Math.sqrt((rayX - player.x) ** 2 + (rayY - player.y) ** 2)) {
-                rayX += Math.cos(angle) * 0.1;
-                rayY += Math.sin(angle) * 0.1;
-
-                if (isWall(rayX, rayY)) {
-                    hitWall = true;
-                    break;
-                }
-            }
-
-            // 壁に当たらず、かつ最も近い敵を記録
-            if (!hitWall && distance < closestDistance) {
-                closestDistance = distance;
+        const dist = distance(player.x, player.y, enemy.x, enemy.y);
+        if (dist < closestDistance && dist < gameConfig.SHOOTING.MAX_DISTANCE) {
+            const angle = Math.atan2(enemy.y - player.y, enemy.x - player.x);
+            const angleDiff = Math.abs(angle - player.dir);
+            if (angleDiff < gameConfig.PLAYER.FOV / 2) {
                 closestEnemy = enemy;
+                closestDistance = dist;
             }
         }
-    });
+    }
 
-    // 最も近い敵にダメージを与える
-    const updatedEnemies = enemies.map(enemy => {
-        if (enemy === closestEnemy && closestDistance < 5 * gameConfig.TILE_SIZE) {
-            hitEnemy = true;
-            return { ...enemy, health: enemy.health - 25 };
+    if (closestEnemy) {
+        closestEnemy.health -= gameConfig.SHOOTING.DAMAGE;
+        if (closestEnemy.health <= 0) {
+            closestEnemy.alive = false;
         }
-        return enemy;
-    });
+    }
 
-    return { player: updatedPlayer, enemies: updatedEnemies, hitEnemy };
-}
+    return { player: newPlayer, enemies: newEnemies };
+};
 
-export function updateEnemies(enemies: Enemy[], player: Player, dt: number): { enemies: Enemy[], player: Player } {
-    const updatedEnemies = enemies.map(enemy => {
-        if (!enemy.alive) return enemy;
+export const updateEnemies = (
+    enemies: Enemy[],
+    player: Player,
+    deltaTime: number
+): { enemies: Enemy[]; player: Player } => {
+    const newEnemies = [...enemies];
+    const newPlayer = { ...player };
 
-        // 敵が死んだ場合の処理
-        if (enemy.health <= 0) {
-            return { ...enemy, alive: false };
-        }
+    for (const enemy of newEnemies) {
+        if (!enemy.alive) continue;
 
-        // プレイヤーとの距離を計算
         const dist = distance(enemy.x, enemy.y, player.x, player.y);
-        const dx = player.x - enemy.x;
-        const dy = player.y - enemy.y;
-        const angle = Math.atan2(dy, dx);
+        if (dist < gameConfig.TILE_SIZE * 2) {
+            if (enemy.attackCooldown <= 0) {
+                newPlayer.health -= gameConfig.ENEMY.ATTACK_DAMAGE;
+                enemy.attackCooldown = gameConfig.ENEMY.ATTACK_COOLDOWN;
+            }
+        } else {
+            const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
+            const newX = enemy.x + Math.cos(angle) * enemy.speed * deltaTime;
+            const newY = enemy.y + Math.sin(angle) * enemy.speed * deltaTime;
 
-        // プレイヤーに向かって移動
-        const newX = enemy.x + Math.cos(angle) * enemy.speed * dt;
-        const newY = enemy.y + Math.sin(angle) * enemy.speed * dt;
-
-        // 壁との衝突チェック
-        if (!isWall(newX, newY)) {
-            enemy.x = newX;
-            enemy.y = newY;
+            if (!isWall(newX, enemy.y)) enemy.x = newX;
+            if (!isWall(enemy.x, newY)) enemy.y = newY;
         }
 
-        // 攻撃クールダウンの更新
         if (enemy.attackCooldown > 0) {
-            enemy.attackCooldown -= dt;
+            enemy.attackCooldown -= deltaTime;
         }
-
-        // プレイヤーが近くにいる場合の攻撃
-        if (dist < gameConfig.TILE_SIZE * 1.5 && enemy.attackCooldown <= 0) {
-            // 壁との衝突チェック
-            let rayX = enemy.x;
-            let rayY = enemy.y;
-            let hitWall = false;
-
-            while (!hitWall && dist > Math.sqrt((rayX - enemy.x) ** 2 + (rayY - enemy.y) ** 2)) {
-                rayX += Math.cos(angle) * 0.1;
-                rayY += Math.sin(angle) * 0.1;
-
-                if (isWall(rayX, rayY)) {
-                    hitWall = true;
-                    break;
-                }
-            }
-
-            // 壁に当たらず、プレイヤーに当たる場合のみダメージを与える
-            if (!hitWall) {
-                player.health = Math.max(0, player.health - 10);
-                enemy.attackCooldown = 60; // 1秒のクールダウン
-            }
-        }
-
-        return enemy;
-    });
-
-    return { enemies: updatedEnemies, player };
-}
-
-export function checkGameState(player: Player, enemies: Enemy[]): 'playing' | 'gameOver' | 'gameClear' {
-    // ゲームオーバー条件：プレイヤーのHPが0
-    if (player.health <= 0) {
-        return 'gameOver';
     }
 
-    // ゲームクリア条件：すべての敵が倒されている
-    const allEnemiesDefeated = enemies.every(enemy => !enemy.alive);
-    if (allEnemiesDefeated) {
-        return 'gameClear';
-    }
+    return { enemies: newEnemies, player: newPlayer };
+};
 
-    return 'playing';
-}
-
-export function castRays(player: Player): { distance: number; angle: number }[] {
-    const rays: { distance: number; angle: number }[] = [];
+export const castRays = (player: Player): { distance: number; wall: boolean; angle: number }[] => {
+    const rays: { distance: number; wall: boolean; angle: number }[] = [];
     const rayAngle = player.fov / gameConfig.RAY_COUNT;
 
     for (let i = 0; i < gameConfig.RAY_COUNT; i++) {
@@ -225,19 +151,17 @@ export function castRays(player: Player): { distance: number; angle: number }[] 
         let rayX = player.x;
         let rayY = player.y;
         let distance = 0;
+        let wall = false;
 
-        while (distance < gameConfig.MAX_DEPTH) {
-            rayX += Math.cos(angle) * 0.1;
-            rayY += Math.sin(angle) * 0.1;
-            distance += 0.1;
-
-            if (isWall(rayX, rayY)) {
-                break;
-            }
+        while (distance < gameConfig.MAX_DEPTH && !wall) {
+            distance += gameConfig.SHOOTING.STEP;
+            rayX = player.x + Math.cos(angle) * distance;
+            rayY = player.y + Math.sin(angle) * distance;
+            wall = isWall(rayX, rayY);
         }
 
-        rays.push({ distance, angle });
+        rays.push({ distance, wall, angle });
     }
 
     return rays;
-} 
+}; 

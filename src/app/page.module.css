@@ -6,8 +6,12 @@
     position: relative;
 }
 
-.gameCanvas {
+.gameWrapper {
     flex-grow: 1;
+    position: relative;
+}
+
+.gameCanvas {
     background-color: #1a1a1a;
     display: block;
     width: 100%;
@@ -119,8 +123,6 @@
     position: absolute;
     top: 16px;
     right: 16px;
-    width: 192px;
-    height: 192px;
     background: rgba(6, 182, 212, 0.15);
     border: 2px solid #06b6d4;
     border-radius: 16px;

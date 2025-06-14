@@ -1,3 +1,5 @@
+import { gameConfig } from '../config/gameConfig';
+
 export interface Player {
     x: number;
     y: number;
@@ -36,14 +38,4 @@ export interface GameState {
     reloading: boolean;
 }
 
-export interface GameConfig {
-    WIDTH: number;
-    HEIGHT: number;
-    MAP_W: number;
-    MAP_H: number;
-    TILE_SIZE: number;
-    MINIMAP_SCALE: number;
-    RAY_COUNT: number;
-    MAX_DEPTH: number;
-    ENEMY_COUNT: number;
-} 
+export type GameConfig = typeof gameConfig; 

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import styles from '../styles/Game.module.css';
 import { gameConfig, MAP } from '../config/gameConfig';
 import { Player, Enemy } from '../types/game';
-import { updatePlayer, spawnEnemies, updateEnemies, castRays } from '../utils/gameLogic';
+import { updatePlayer, spawnEnemies, updateEnemies, castRays, shoot } from '../utils/gameLogic';
 
 export default function Game() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -38,41 +38,34 @@ export default function Game() {
     const mapCtx = minimap.getContext('2d');
     if (!ctx || !mapCtx) return;
 
-    // Initialize enemies
     enemiesRef.current = spawnEnemies(playerRef.current);
     setEnemies(enemiesRef.current);
 
-    // Request pointer lock on canvas click
     const handleCanvasClick = () => {
       canvas.requestPointerLock();
     };
 
     canvas.addEventListener('click', handleCanvasClick);
 
-    // Game loop
     let lastTime = performance.now();
     function gameLoop(time: number) {
       const dt = (time - lastTime) / 16.6667;
       lastTime = time;
 
-      // Update player position
       const updatedPlayer = updatePlayer(playerRef.current);
       playerRef.current = updatedPlayer;
       setPlayer(updatedPlayer);
 
-      // Update enemies
       const { enemies: updatedEnemies, player: newPlayer } = updateEnemies(enemiesRef.current, playerRef.current, dt);
       enemiesRef.current = updatedEnemies;
       playerRef.current = newPlayer;
       setEnemies(updatedEnemies);
       setPlayer(newPlayer);
 
-      // 3Dビューを描画
       if (ctx) {
         draw(ctx);
       }
 
-      // ミニマップを描画
       if (mapCtx) {
         drawMinimap(mapCtx);
       }
@@ -80,10 +73,8 @@ export default function Game() {
       requestAnimationFrame(gameLoop);
     }
 
-    // Start game loop
     requestAnimationFrame(gameLoop);
 
-    // Event listeners
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.repeat) return;
       switch (e.code) {
@@ -104,10 +95,10 @@ export default function Game() {
           setPlayer(p => ({ ...p, moving: { ...p.moving, right: true } }));
           break;
         case 'Space':
-          shoot();
+          handleShoot();
           break;
         case 'KeyR':
-          reload();
+          handleReload();
           break;
       }
     };
@@ -159,23 +150,20 @@ export default function Game() {
     };
   }, [pointerLocked]);
 
-  const shoot = () => {
+  const handleShoot = () => {
     if (playerRef.current.ammo <= 0 || reloading || gameState !== 'playing') return;
 
-    // shootPlayerAndEnemies という新しい関数を使って修正
-    // shoot関数がvoidを返しているため、別の関数名にしていると仮定
-    const { player: newPlayer, enemies: newEnemies, hitEnemy } = shootPlayerAndEnemies(playerRef.current, enemiesRef.current);
+    const { player: newPlayer, enemies: newEnemies, hitEnemy } = shoot(playerRef.current, enemiesRef.current);
     playerRef.current = newPlayer;
     enemiesRef.current = newEnemies;
     setPlayer(newPlayer);
     setEnemies(newEnemies);
     setHitMarker(hitEnemy);
 
-    // ヒットマーカーの表示をリセット
     setTimeout(() => setHitMarker(false), 100);
   };
 
-  const reload = () => {
+  const handleReload = () => {
     if (reloading || playerRef.current.ammo === playerRef.current.maxAmmo || gameState !== 'playing') return;
 
     setReloading(true);
@@ -187,34 +175,10 @@ export default function Game() {
     }, 2000);
   };
 
-  const restartGame = () => {
-    const newPlayer = {
-      x: gameConfig.TILE_SIZE * 3,
-      y: gameConfig.TILE_SIZE * 3,
-      dir: 0,
-      fov: Math.PI / 3,
-      health: 100,
-      maxHealth: 100,
-      ammo: 50,
-      maxAmmo: 50,
-      moving: { forward: false, backward: false, left: false, right: false },
-      speed: 0.8,
-      rotSpeed: 0.01,
-      attackCooldown: 0,
-    };
-    playerRef.current = newPlayer;
-    setPlayer(newPlayer);
-    enemiesRef.current = spawnEnemies(newPlayer);
-    setEnemies(enemiesRef.current);
-    setGameState('playing');
-  };
-
   const draw = (ctx: CanvasRenderingContext2D) => {
-    // 画面をクリア
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, gameConfig.WIDTH, gameConfig.HEIGHT);
 
-    // 3Dビューの描画
     const rays = castRays(playerRef.current);
     const wallHeight = gameConfig.HEIGHT / 2;
     const wallWidth = gameConfig.WIDTH / gameConfig.RAY_COUNT;
@@ -231,7 +195,6 @@ export default function Game() {
       );
     });
 
-    // 敵の描画
     enemiesRef.current.forEach(enemy => {
       if (!enemy.alive) return;
 
@@ -262,10 +225,8 @@ export default function Game() {
     const minimap = minimapRef.current;
     if (!minimap) return;
 
-    // Clear minimap
     ctx.clearRect(0, 0, minimap.width, minimap.height);
 
-    // Draw map grid
     for (let y = 0; y < MAP_H; y++) {
       for (let x = 0; x < MAP_W; x++) {
         const tile = MAP[y * MAP_W + x];
@@ -274,7 +235,6 @@ export default function Game() {
       }
     }
 
-    // Draw enemies
     enemiesRef.current.forEach(enemy => {
       if (!enemy.alive) return;
       ctx.fillStyle = '#ef4444';
@@ -289,7 +249,6 @@ export default function Game() {
       ctx.fill();
     });
 
-    // Draw player
     ctx.fillStyle = '#06b6d4';
     ctx.beginPath();
     ctx.arc(
@@ -301,7 +260,6 @@ export default function Game() {
     );
     ctx.fill();
 
-    // Draw player direction
     ctx.strokeStyle = '#06b6d4';
     ctx.beginPath();
     ctx.moveTo(
@@ -324,24 +282,25 @@ export default function Game() {
           width={gameConfig.WIDTH}
           height={gameConfig.HEIGHT}
         />
-        <div className={styles.crosshair}>
-          <div className={styles.crosshairInner} />
-          {hitMarker && <div className={styles.hitMarker} />}
+        <div className={`${styles.crosshair} ${hitMarker ? styles.shoot : ''}`}>
+          <div className={`${styles.crosshairLine} ${styles.top}`} />
+          <div className={`${styles.crosshairLine} ${styles.bottom}`} />
+          <div className={`${styles.crosshairLine} ${styles.left}`} />
+          <div className={`${styles.crosshairLine} ${styles.right}`} />
         </div>
         <div className={styles.hud}>
-          <div className={styles.healthBar}>
-            <div
-              className={styles.healthFill}
-              style={{ width: `${(player.health / player.maxHealth) * 100}%` }}
-            />
-            <span>HP: {player.health}</span>
+          <div className={styles.health}>
+            Health
+            <div className={styles.healthBarContainer}>
+              <div
+                className={styles.healthBar}
+                style={{ width: `${(player.health / player.maxHealth) * 100}%` }}
+              />
+            </div>
+            <span>{player.health}</span>
           </div>
-          <div className={styles.ammoBar}>
-            <div
-              className={styles.ammoFill}
-              style={{ width: `${(player.ammo / player.maxAmmo) * 100}%` }}
-            />
-            <span>弾: {player.ammo}</span>
+          <div className={styles.ammo}>
+            Ammo <span className={styles.ammoCount}>{player.ammo}</span>
           </div>
         </div>
       </div>
@@ -351,22 +310,14 @@ export default function Game() {
         width={gameConfig.MAP_W * gameConfig.MINIMAP_SCALE}
         height={gameConfig.MAP_H * gameConfig.MINIMAP_SCALE}
       />
-      {gameState !== 'playing' && (
-        <div className={styles.gameOverlay}>
-          <div className={styles.gameMessage}>
-            <h2>{gameState === 'gameOver' ? 'ゲームオーバー' : 'ゲームクリア！'}</h2>
-            <button onClick={restartGame}>リトライ</button>
-          </div>
+      <div className={`${styles.touchControls} ${pointerLocked ? styles.active : ''}`}>
+        <div className={styles.joystickContainer}>
+          <div className={styles.joystickThumb} />
         </div>
-      )}
-      <div className={styles.touchControls}>
-        <div className={styles.joystick} />
-        <button className={styles.shootButton} onTouchStart={shoot} />
+        <button className={styles.shootButton} onClick={handleShoot}>
+          Shoot
+        </button>
       </div>
     </div>
   );
 } 
-
-function shootPlayerAndEnemies(current: Player, current1: Enemy[]): { player: any; enemies: any; hitEnemy: any; } {
-  throw new Error('Function not implemented.');
-}
